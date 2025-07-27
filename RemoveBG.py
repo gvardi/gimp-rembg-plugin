@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# RemoveBG-gimp3.py
-# A GIMP 3.0 plugin to remove backgrounds from images using AI
+# Modified GIMP plugin to remove backgrounds from images
 # with an option to process all open images.
 # Original author: James Huang <elastic192@gmail.com>
 # Modified by: Tech Archive <medium.com/@techarchive>
-# Converted to GIMP 3.0: 2024
+# Modified by: Guy Vardi 
+# Date: 27/7/25 
 
 import sys
 import os
