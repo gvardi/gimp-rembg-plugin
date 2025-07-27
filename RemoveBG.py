@@ -44,8 +44,7 @@ def load_config():
         'default_model': '0',
         'default_as_mask': 'False',
         'default_alpha_matting': 'False',
-        'default_make_square': 'False',
-        'default_process_all_images': 'False'
+        'default_make_square': 'False'
     }
     config['Debug'] = {
         'debug_enabled': 'False'
@@ -298,7 +297,6 @@ class RemoveBGPlugin(Gimp.PlugIn):
         alpha_matting = self.config.getboolean('Settings', 'default_alpha_matting')
         ae_value = self.config.getint('Settings', 'default_alpha_matting_value')
         make_square = self.config.getboolean('Settings', 'default_make_square')
-        process_all_images = self.config.getboolean('Settings', 'default_process_all_images')
 
         # --- Settings Dialog ---
         if run_mode == Gimp.RunMode.INTERACTIVE:
@@ -350,9 +348,10 @@ class RemoveBGPlugin(Gimp.PlugIn):
             square_check.set_active(False)
             box.pack_start(square_check, False, False, 0)
 
-            # Process all images checkbox
-            all_images_check = Gtk.CheckButton(label="Process all open images")
+            # Process all images checkbox (disabled)
+            all_images_check = Gtk.CheckButton(label="Process all open images (disabled)")
             all_images_check.set_active(False)
+            all_images_check.set_sensitive(False)  # Disable the checkbox
             box.pack_start(all_images_check, False, False, 0)
 
             dialog.show_all()
@@ -373,44 +372,19 @@ class RemoveBGPlugin(Gimp.PlugIn):
         # Process images
         try:
             if process_all_images:
-                # Get all open images using GIMP 3.0 API
-                images_array = Gimp.get_images()
-                if not images_array:
+                # Batch processing is temporarily disabled
+                Gimp.message("Batch processing is currently disabled. Processing current image only.")
+                process_all_images = False
+                image.undo_group_start()
+                success, message = self.remove_background_from_image(
+                    image, as_mask, sel_model, alpha_matting, ae_value, make_square
+                )
+                image.undo_group_end()
+                if not success:
                     return procedure.new_return_values(
                         Gimp.PDBStatusType.EXECUTION_ERROR,
-                        GLib.Error("No open images found")
+                        GLib.Error(f"Error: {message}")
                     )
-                
-                # Gimp.get_images() returns a Python list, not a NULL-terminated array
-                images = list(images_array)  # Convert to list if needed
-                Gimp.message(f"DEBUG: Total images in list: {len(images)}")
-                
-                # Filter for valid images (those that have layers)
-                valid_images = []
-                for img in images:
-                    try:
-                        layers = img.get_layers()
-                        if layers and len(layers) > 0:
-                            valid_images.append(img)
-                            Gimp.message(f"DEBUG: Valid image found: {img}")
-                    except Exception as e:
-                        Gimp.message(f"DEBUG: Skipping invalid image: {e}")
-                
-                Gimp.message(f"DEBUG: Valid images found: {len(valid_images)}")
-                images = valid_images
-                
-                # Process each image
-                for img in images:
-                    img.undo_group_start()
-                    success, message = self.remove_background_from_image(
-                        img, as_mask, sel_model, alpha_matting, ae_value, make_square
-                    )
-                    img.undo_group_end()
-                    if not success:
-                        return procedure.new_return_values(
-                            Gimp.PDBStatusType.EXECUTION_ERROR,
-                            GLib.Error(f"Error processing image: {message}")
-                        )
             else:
                 image.undo_group_start()
                 success, message = self.remove_background_from_image(
