@@ -374,11 +374,43 @@ class RemoveBGPlugin(Gimp.PlugIn):
         try:
             if process_all_images:
                 # Get all open images using GIMP 3.0 API
-                # Note: In GIMP 3.0, we need to use a different approach
-                # For now, we'll process only the current image and show a message
-                Gimp.message("Batch processing is not yet fully implemented in GIMP 3.0")
-                Gimp.message("Processing current image only...")
-                process_all_images = False
+                images_array = Gimp.get_images()
+                if not images_array:
+                    return procedure.new_return_values(
+                        Gimp.PDBStatusType.EXECUTION_ERROR,
+                        GLib.Error("No open images found")
+                    )
+                
+                # Gimp.get_images() returns a Python list, not a NULL-terminated array
+                images = list(images_array)  # Convert to list if needed
+                Gimp.message(f"DEBUG: Total images in list: {len(images)}")
+                
+                # Filter for valid images (those that have layers)
+                valid_images = []
+                for img in images:
+                    try:
+                        layers = img.get_layers()
+                        if layers and len(layers) > 0:
+                            valid_images.append(img)
+                            Gimp.message(f"DEBUG: Valid image found: {img}")
+                    except Exception as e:
+                        Gimp.message(f"DEBUG: Skipping invalid image: {e}")
+                
+                Gimp.message(f"DEBUG: Valid images found: {len(valid_images)}")
+                images = valid_images
+                
+                # Process each image
+                for img in images:
+                    img.undo_group_start()
+                    success, message = self.remove_background_from_image(
+                        img, as_mask, sel_model, alpha_matting, ae_value, make_square
+                    )
+                    img.undo_group_end()
+                    if not success:
+                        return procedure.new_return_values(
+                            Gimp.PDBStatusType.EXECUTION_ERROR,
+                            GLib.Error(f"Error processing image: {message}")
+                        )
             else:
                 image.undo_group_start()
                 success, message = self.remove_background_from_image(
